@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🐴 Donkey Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0d1117;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    h1 { color: #00d9ff; margin-top: 20px; }
+    .btn-primary, .btn-secondary {
+      border: none; padding: 10px 20px; margin: 10px;
+      border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s;
+    }
+    .btn-primary { background: #00d9ff; color: #000; }
+    .btn-primary:hover { background: #00b8d4; }
+    .btn-secondary { background: #ff5050; color: white; }
+    .game-table {
+      background: radial-gradient(circle at center, #0b6623, #003300);
+      border: 5px solid gold; border-radius: 40px; padding: 30px;
+      margin: 30px auto; width: 85%; text-align: center;
+      box-shadow: 0 0 20px rgba(0,0,0,0.6);
+    }
+    .players-grid {
+      display: flex; justify-content: space-around; flex-wrap: wrap; margin-bottom: 20px;
+    }
+    .player-card {
+      background: #1c1f26; border-radius: 20px; padding: 15px; width: 150px;
+      color: white; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .avatar {
+      width: 80px; height: 80px; border-radius: 50%; border: 3px solid gold;
+    }
+    .round-inputs {
+      display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin: 15px 0;
+    }
+    .round-inputs input {
+      width: 80px; padding: 6px; border-radius: 10px; border: 1px solid #ccc; text-align: center;
+    }
+    #error { color: #ff4d4d; font-weight: bold; margin: 10px 0; }
+    #loser { font-size: 22px; font-weight: bold; margin-top: 20px; color: #ffcc00; }
+    .hidden { display: none; }
+    canvas {
+      position: fixed; top: 0; left: 0; pointer-events: none;
+      width: 100%; height: 100%; z-index: 9999;
+    }
+  </style>
+</head>
+<body>
+  <h1>🐴 Donkey Game</h1>
+  <p>Enter participant names and play until one reaches 100 points!</p>
+
+  <div id="donkey-game">
+    <div class="player-inputs">
+      <input type="text" id="p1" placeholder="Player 1" />
+      <input type="text" id="p2" placeholder="Player 2" />
+      <input type="text" id="p3" placeholder="Player 3" />
+      <input type="text" id="p4" placeholder="Player 4" />
+    </div>
+    <button onclick="startGame()" class="btn-primary">Start Game</button>
+    <button onclick="resetGame()" class="btn-secondary">Reset</button>
+
+    <div id="gameTable" class="game-table hidden">
+      <div class="players-grid">
+        <div class="player-card">
+          <img src="https://cdn-icons-png.flaticon.com/512/2922/2922506.png" class="avatar" />
+          <h3 id="name1">Player 1</h3><p>Score: <span id="score1">0</span></p>
+        </div>
+        <div class="player-card">
+          <img src="https://cdn-icons-png.flaticon.com/512/2922/2922510.png" class="avatar" />
+          <h3 id="name2">Player 2</h3><p>Score: <span id="score2">0</span></p>
+        </div>
+        <div class="player-card">
+          <img src="https://cdn-icons-png.flaticon.com/512/2922/2922656.png" class="avatar" />
+          <h3 id="name3">Player 3</h3><p>Score: <span id="score3">0</span></p>
+        </div>
+        <div class="player-card">
+          <img src="https://cdn-icons-png.flaticon.com/512/2922/2922688.png" class="avatar" />
+          <h3 id="name4">Player 4</h3><p>Score: <span id="score4">0</span></p>
+        </div>
+      </div>
+
+      <h3 id="roundTitle">Round 1</h3>
+      <div class="round-inputs">
+        <input type="number" id="r1" placeholder="P1 pts" min="0" max="35" />
+        <input type="number" id="r2" placeholder="P2 pts" min="0" max="35" />
+        <input type="number" id="r3" placeholder="P3 pts" min="0" max="35" />
+        <input type="number" id="r4" placeholder="P4 pts" min="0" max="35" />
+      </div>
+      <div id="error"></div>
+      <button onclick="submitRound()" id="nextRoundBtn" class="btn-primary">Submit Round</button>
+
+      <div id="loser"></div>
+    </div>
+  </div>
+
+  <canvas id="confetti"></canvas>
+
+  <script>
+    let scores = [0, 0, 0, 0];
+    let round = 1;
+    const MAX_SCORE = 100;
+    const MAX_ROUND_POINTS = 35;
+
+    /* ---------------- CONFETTI CONTROL ---------------- */
+    let confettiAnimation = null;
+    const c = document.getElementById("confetti");
+    const ctx = c.getContext("2d");
+
+    function stopConfetti() {
+      if (confettiAnimation) {
+        cancelAnimationFrame(confettiAnimation);
+        confettiAnimation = null;
+      }
+      ctx.clearRect(0, 0, c.width, c.height);
+    }
+    /* -------------------------------------------------- */
+
+    function startGame() {
+      document.getElementById("gameTable").classList.remove("hidden");
+      for (let i = 1; i <= 4; i++) {
+        let name = document.getElementById("p" + i).value.trim() || "Player " + i;
+        document.getElementById("name" + i).innerText = name;
+      }
+    }
+
+    function submitRound() {
+      let roundScores = [];
+      for (let i = 1; i <= 4; i++) {
+        let val = parseInt(document.getElementById("r" + i).value) || 0;
+        if (val < 0) val = 0;
+        if (val > MAX_ROUND_POINTS) val = MAX_ROUND_POINTS;
+        roundScores.push(val);
+      }
+
+      const total = roundScores.reduce((a,b)=>a+b,0);
+      const errorDiv = document.getElementById("error");
+
+      if (total > MAX_ROUND_POINTS) {
+        errorDiv.innerText = `❌ Total points (${total}) exceed 35 — please adjust.`;
+        return;
+      } else {
+        errorDiv.innerText = "";
+      }
+
+      for (let i = 0; i < 4; i++) {
+        scores[i] += roundScores[i];
+        document.getElementById("score" + (i+1)).innerText = scores[i];
+        document.getElementById("r" + (i+1)).value = "";
+      }
+
+      round++;
+      document.getElementById("roundTitle").innerText = "Round " + round;
+      checkLoser();
+    }
+
+    function checkLoser() {
+      const loserIndex = scores.findIndex(s => s >= MAX_SCORE);
+      if (loserIndex !== -1) {
+        const loserName = document.getElementById("name" + (loserIndex + 1)).innerText;
+        document.getElementById("loser").innerHTML = 
+          `🐴 <b>${loserName}</b> reached 100+ points — is the DONKEY (Loser)!`;
+        document.getElementById("nextRoundBtn").disabled = true;
+        launchConfetti();
+      }
+    }
+
+    function resetGame() {
+      stopConfetti();  /* 🛑 stop animation immediately */
+
+      scores = [0,0,0,0];
+      round = 1;
+
+      document.getElementById("roundTitle").innerText = "Round 1";
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById("score"+i).innerText = "0";
+        document.getElementById("r"+i).value = "";
+        document.getElementById("name"+i).innerText = "Player " + i;
+        document.getElementById("p"+i).value = "";
+      }
+      document.getElementById("error").innerText = "";
+      document.getElementById("loser").innerHTML = "";
+      document.getElementById("nextRoundBtn").disabled = false;
+      document.getElementById("gameTable").classList.add("hidden");
+    }
+
+    /* 🎉 CONFETTI */
+    function launchConfetti() {
+      c.width = window.innerWidth;
+      c.height = window.innerHeight;
+
+      const pieces = Array.from({length:200}, () => ({
+        x: Math.random()*c.width,
+        y: Math.random()*c.height - c.height,
+        size: Math.random()*8 + 4,
+        speed: Math.random()*3 + 2,
+        color: `hsl(${Math.random()*360},100%,50%)`
+      }));
+
+      function draw() {
+        ctx.clearRect(0,0,c.width,c.height);
+        pieces.forEach(p => {
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x,p.y,p.size,p.size);
+          p.y += p.speed;
+          if (p.y > c.height) p.y = -p.size;
+        });
+
+        confettiAnimation = requestAnimationFrame(draw);
+      }
+
+      draw();
+      setTimeout(stopConfetti, 4000);
+    }
+  </script>
+</body>
+</html>
