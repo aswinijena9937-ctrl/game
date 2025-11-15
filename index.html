@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🐴 Donkey Game</title>
 
-  <!-- 🔥 PWA Support -->
- <link rel="icon" type="image/png" href="icon-512.png">
- <link rel="apple-touch-icon" href="icon-512.png">
- <link rel="manifest" href="manifest.json">
-
+  <!-- PWA Icons -->
+  <link rel="icon" type="image/png" href="icon-512.png">
+  <link rel="apple-touch-icon" href="icon-512.png">
+  <link rel="manifest" href="manifest.json">
 
   <script>
     if ("serviceWorker" in navigator) {
@@ -28,19 +27,22 @@
       padding: 0;
     }
     h1 { color: #00d9ff; margin-top: 20px; }
-    .btn-primary, .btn-secondary {
+    .btn-primary, .btn-secondary, .btn-history {
       border: none; padding: 10px 20px; margin: 10px;
       border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s;
     }
     .btn-primary { background: #00d9ff; color: #000; }
     .btn-primary:hover { background: #00b8d4; }
     .btn-secondary { background: #ff5050; color: white; }
+    .btn-history { background: gold; color: black; }
+
     .game-table {
       background: radial-gradient(circle at center, #0b6623, #003300);
       border: 5px solid gold; border-radius: 40px; padding: 30px;
       margin: 30px auto; width: 85%; text-align: center;
       box-shadow: 0 0 20px rgba(0,0,0,0.6);
     }
+
     .players-grid {
       display: flex; justify-content: space-around; flex-wrap: wrap; margin-bottom: 20px;
     }
@@ -60,6 +62,25 @@
     #error { color: #ff4d4d; font-weight: bold; margin: 10px 0; }
     #loser { font-size: 22px; font-weight: bold; margin-top: 20px; color: #ffcc00; }
     .hidden { display: none; }
+
+    /* Modal for History */
+    #historyModal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center;
+      z-index: 99999;
+    }
+    #historyBox {
+      width: 90%; max-width: 500px; background: #1e1e1e; color: white;
+      padding: 20px; border-radius: 15px; max-height: 80%; overflow-y: auto;
+      box-shadow: 0 0 20px black;
+    }
+    .history-item {
+      border-bottom: 1px solid gray; padding: 10px 0; text-align: left;
+    }
+    .close-btn {
+      background: red; padding: 8px 15px; border-radius: 8px; cursor: pointer; color: white; margin-top: 10px;
+    }
+
     canvas {
       position: fixed; top: 0; left: 0; pointer-events: none;
       width: 100%; height: 100%; z-index: 9999;
@@ -70,6 +91,8 @@
 <body>
   <h1>🐴 Donkey Game</h1>
   <p>Enter participant names and play until one reaches 100 points!</p>
+
+  <button onclick="openHistory()" class="btn-history">📘 Game History</button>
 
   <div id="donkey-game">
     <div class="player-inputs">
@@ -117,12 +140,20 @@
 
   <canvas id="confetti"></canvas>
 
+  <!-- HISTORY MODAL -->
+  <div id="historyModal">
+    <div id="historyBox">
+      <h2>📘 Game History</h2>
+      <div id="historyContent"></div>
+      <button class="close-btn" onclick="closeHistory()">Close</button>
+    </div>
+  </div>
+
   <script>
     let scores = [0, 0, 0, 0];
     let round = 1;
     const MAX_SCORE = 100;
     const MAX_ROUND_POINTS = 35;
-
     let animationActive = false;
 
     function startGame() {
@@ -137,8 +168,7 @@
       let roundScores = [];
       for (let i = 1; i <= 4; i++) {
         let val = parseInt(document.getElementById("r" + i).value) || 0;
-        if (val < 0) val = 0;
-        if (val > MAX_ROUND_POINTS) val = MAX_ROUND_POINTS;
+        val = Math.max(0, Math.min(val, MAX_ROUND_POINTS));
         roundScores.push(val);
       }
 
@@ -148,9 +178,7 @@
       if (total > MAX_ROUND_POINTS) {
         errorDiv.innerText = `❌ Total points (${total}) exceed 35 — please adjust.`;
         return;
-      } else {
-        errorDiv.innerText = "";
-      }
+      } else { errorDiv.innerText = ""; }
 
       for (let i = 0; i < 4; i++) {
         scores[i] += roundScores[i];
@@ -172,8 +200,54 @@
 
         document.getElementById("nextRoundBtn").disabled = true;
 
+        saveGameResult(loser);
         launchConfetti();
       }
+    }
+
+    function saveGameResult(loserName) {
+      let game = {
+        date: new Date().toLocaleString(),
+        players: [
+          document.getElementById("name1").innerText,
+          document.getElementById("name2").innerText,
+          document.getElementById("name3").innerText,
+          document.getElementById("name4").innerText
+        ],
+        scores: [...scores],
+        loser: loserName
+      };
+
+      let history = JSON.parse(localStorage.getItem("donkey_history") || "[]");
+      history.push(game);
+      localStorage.setItem("donkey_history", JSON.stringify(history));
+    }
+
+    function openHistory() {
+      let list = JSON.parse(localStorage.getItem("donkey_history") || "[]");
+      const box = document.getElementById("historyContent");
+      box.innerHTML = "";
+
+      if (list.length === 0) {
+        box.innerHTML = "<p>No history found.</p>";
+      } else {
+        list.forEach((g, i) => {
+          box.innerHTML += `
+            <div class="history-item">
+              <b>${i+1}. Date:</b> ${g.date}<br>
+              <b>Players:</b> ${g.players.join(", ")}<br>
+              <b>Scores:</b> ${g.scores.join(" - ")}<br>
+              <b>Loser:</b> 🐴 ${g.loser}
+            </div>
+          `;
+        });
+      }
+
+      document.getElementById("historyModal").style.display = "flex";
+    }
+
+    function closeHistory() {
+      document.getElementById("historyModal").style.display = "none";
     }
 
     function resetGame() {
@@ -181,17 +255,14 @@
       round = 1;
 
       animationActive = false;
-
       const c = document.getElementById("confetti");
       const ctx = c.getContext("2d");
-      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.clearRect(0,0,c.width,c.height);
 
       document.getElementById("roundTitle").innerText = "Round 1";
       for (let i = 1; i <= 4; i++) {
         document.getElementById("score"+i).innerText = "0";
         document.getElementById("r"+i).value = "";
-        document.getElementById("name"+i).innerText = "Player " + i;
-        document.getElementById("p"+i).value = "";
       }
 
       document.getElementById("error").innerText = "";
@@ -200,7 +271,7 @@
       document.getElementById("gameTable").classList.add("hidden");
     }
 
-    // Confetti
+    /* CONFETTI */
     function launchConfetti() {
       const c = document.getElementById("confetti");
       const ctx = c.getContext("2d");
@@ -219,8 +290,8 @@
 
       function draw() {
         if (!animationActive) return;
-
         ctx.clearRect(0,0,c.width,c.height);
+
         pieces.forEach(p => {
           ctx.fillStyle = p.color;
           ctx.fillRect(p.x, p.y, p.size, p.size);
@@ -241,4 +312,3 @@
   </script>
 </body>
 </html>
-
